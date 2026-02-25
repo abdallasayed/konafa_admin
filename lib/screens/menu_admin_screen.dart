@@ -14,12 +14,12 @@ class MenuAdminScreen extends StatefulWidget {
 
 class _MenuAdminScreenState extends State<MenuAdminScreen> {
   
-  // دالة الرفع إلى Uploadcare
+  // دالة الرفع إلى Uploadcare (تم إضافة أمر الحفظ الدائم)
   Future<String?> _uploadToUploadcare(File imageFile) async {
     try {
       var request = http.MultipartRequest('POST', Uri.parse('https://upload.uploadcare.com/base/'));
-      // إضافة مفتاحك الخاص
       request.fields['UPLOADCARE_PUB_KEY'] = '740f07d1a15d7ad16ff0';
+      request.fields['UPLOADCARE_STORE'] = '1'; // مهم جداً لحفظ الصورة بشكل دائم
       request.files.add(await http.MultipartFile.fromPath('file', imageFile.path));
 
       var response = await request.send();
@@ -27,7 +27,6 @@ class _MenuAdminScreenState extends State<MenuAdminScreen> {
         var responseData = await response.stream.bytesToString();
         var json = jsonDecode(responseData);
         String uuid = json['file'];
-        // تكوين الرابط النهائي للصورة المرفوعة
         return 'https://ucarecdn.com/$uuid/';
       }
     } catch (e) {
@@ -63,11 +62,15 @@ class _MenuAdminScreenState extends State<MenuAdminScreen> {
     );
   }
 
-  void _showAddProductSheet() {
-    final nameController = TextEditingController();
-    final priceController = TextEditingController();
-    final descController = TextEditingController();
-    String? selectedCategoryId;
+  // النافذة الذكية: تعمل كـ "إضافة" وكـ "تعديل" بناءً على البيانات الممررة لها
+  void _showProductFormSheet({String? productId, Map<String, dynamic>? existingProduct}) {
+    final isEditing = productId != null && existingProduct != null;
+    
+    final nameController = TextEditingController(text: isEditing ? existingProduct['name'] : '');
+    final priceController = TextEditingController(text: isEditing ? existingProduct['price'].toString() : '');
+    final descController = TextEditingController(text: isEditing ? existingProduct['description'] : '');
+    String? selectedCategoryId = isEditing ? existingProduct['categoryId'] : null;
+    String existingImageUrl = isEditing ? (existingProduct['imageUrl'] ?? '') : '';
     
     File? pickedImage;
     bool isUploading = false;
@@ -96,16 +99,19 @@ class _MenuAdminScreenState extends State<MenuAdminScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text('إضافة منتج جديد', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.green)),
+                    Text(isEditing ? 'تعديل المنتج' : 'إضافة منتج جديد', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.green)),
                     const SizedBox(height: 15),
                     
+                    // صورة المنتج (تعرض الصورة القديمة إن وجدت أو الجديدة المرفوعة)
                     GestureDetector(
                       onTap: pickImage,
                       child: CircleAvatar(
                         radius: 50,
                         backgroundColor: Colors.green.shade50,
-                        backgroundImage: pickedImage != null ? FileImage(pickedImage!) : null,
-                        child: pickedImage == null ? const Icon(Icons.add_a_photo, size: 40, color: Colors.green) : null,
+                        backgroundImage: pickedImage != null 
+                            ? FileImage(pickedImage!) 
+                            : (existingImageUrl.isNotEmpty ? NetworkImage(existingImageUrl) : null) as ImageProvider?,
+                        child: (pickedImage == null && existingImageUrl.isEmpty) ? const Icon(Icons.add_a_photo, size: 40, color: Colors.green) : null,
                       ),
                     ),
                     const SizedBox(height: 15),
@@ -149,37 +155,48 @@ class _MenuAdminScreenState extends State<MenuAdminScreen> {
                             setModalState(() { isUploading = true; });
 
                             try {
-                              String imageUrl = '';
+                              String finalImageUrl = existingImageUrl; // نبقي الصورة القديمة مبدئياً
                               
-                              // الرفع إلى Uploadcare إذا تم اختيار صورة
+                              // إذا اختار صورة جديدة، نرفعها لـ Uploadcare
                               if (pickedImage != null) {
                                 String? uploadedUrl = await _uploadToUploadcare(pickedImage!);
                                 if (uploadedUrl != null) {
-                                  imageUrl = uploadedUrl;
+                                  finalImageUrl = uploadedUrl;
                                 } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('فشل رفع الصورة، سيتم الحفظ بدونها')));
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('فشل رفع الصورة!')));
+                                  setModalState(() { isUploading = false; });
+                                  return;
                                 }
                               }
 
-                              await FirebaseFirestore.instance.collection('products').add({
+                              final productDataToSave = {
                                 'name': nameController.text,
                                 'price': double.tryParse(priceController.text) ?? 0.0,
                                 'description': descController.text,
                                 'categoryId': selectedCategoryId,
-                                'isAvailable': true,
-                                'imageUrl': imageUrl,
-                                'createdAt': FieldValue.serverTimestamp(),
-                              });
+                                'imageUrl': finalImageUrl,
+                              };
+
+                              if (isEditing) {
+                                // تعديل
+                                await FirebaseFirestore.instance.collection('products').doc(productId).update(productDataToSave);
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم التعديل بنجاح!')));
+                              } else {
+                                // إضافة جديدة
+                                productDataToSave['isAvailable'] = true;
+                                productDataToSave['createdAt'] = FieldValue.serverTimestamp();
+                                await FirebaseFirestore.instance.collection('products').add(productDataToSave);
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت الإضافة بنجاح!')));
+                              }
 
                               Navigator.pop(ctx);
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت الإضافة بنجاح!')));
                             } catch (error) {
                               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('حدث خطأ: $error')));
                             } finally {
                               setModalState(() { isUploading = false; });
                             }
                           },
-                          child: const Text('حفظ المنتج', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                          child: Text(isEditing ? 'تعديل المنتج' : 'حفظ المنتج', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                         ),
                     const SizedBox(height: 20),
                   ],
@@ -201,7 +218,7 @@ class _MenuAdminScreenState extends State<MenuAdminScreen> {
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddProductSheet,
+        onPressed: () => _showProductFormSheet(), // فتح كنافذة إضافة
         backgroundColor: Colors.green.shade700,
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text('إضافة منتج', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -228,7 +245,7 @@ class _MenuAdminScreenState extends State<MenuAdminScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 elevation: 3,
                 child: ListTile(
-                  contentPadding: const EdgeInsets.all(12),
+                  contentPadding: const EdgeInsets.all(8),
                   leading: CircleAvatar(
                     radius: 25,
                     backgroundColor: isAvailable ? Colors.green.shade50 : Colors.grey.shade200,
@@ -236,7 +253,7 @@ class _MenuAdminScreenState extends State<MenuAdminScreen> {
                     child: imageUrl.isEmpty ? Icon(Icons.fastfood, color: isAvailable ? Colors.green : Colors.grey) : null,
                   ),
                   title: Text(product['name'] ?? '', style: TextStyle(fontWeight: FontWeight.bold, decoration: isAvailable ? null : TextDecoration.lineThrough)),
-                  subtitle: Text('${product['price']} ج\n${product['description'] ?? ''}'),
+                  subtitle: Text('${product['price']} ج'),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -244,6 +261,11 @@ class _MenuAdminScreenState extends State<MenuAdminScreen> {
                         value: isAvailable,
                         activeColor: Colors.green,
                         onChanged: (val) => _toggleAvailability(productId, isAvailable),
+                      ),
+                      // زر التعديل الجديد
+                      IconButton(
+                        icon: const Icon(Icons.edit, color: Colors.blue),
+                        onPressed: () => _showProductFormSheet(productId: productId, existingProduct: product),
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete, color: Colors.red),
