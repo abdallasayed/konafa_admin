@@ -1,5 +1,9 @@
+import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
 
 class MenuAdminScreen extends StatefulWidget {
   const MenuAdminScreen({super.key});
@@ -9,14 +13,35 @@ class MenuAdminScreen extends StatefulWidget {
 }
 
 class _MenuAdminScreenState extends State<MenuAdminScreen> {
-  // دالة لتغيير حالة توفر المنتج
+  
+  // دالة الرفع إلى Uploadcare
+  Future<String?> _uploadToUploadcare(File imageFile) async {
+    try {
+      var request = http.MultipartRequest('POST', Uri.parse('https://upload.uploadcare.com/base/'));
+      // إضافة مفتاحك الخاص
+      request.fields['UPLOADCARE_PUB_KEY'] = '740f07d1a15d7ad16ff0';
+      request.files.add(await http.MultipartFile.fromPath('file', imageFile.path));
+
+      var response = await request.send();
+      if (response.statusCode == 200) {
+        var responseData = await response.stream.bytesToString();
+        var json = jsonDecode(responseData);
+        String uuid = json['file'];
+        // تكوين الرابط النهائي للصورة المرفوعة
+        return 'https://ucarecdn.com/$uuid/';
+      }
+    } catch (e) {
+      debugPrint('Upload error: $e');
+    }
+    return null;
+  }
+
   void _toggleAvailability(String productId, bool currentValue) {
     FirebaseFirestore.instance.collection('products').doc(productId).update({
       'isAvailable': !currentValue,
     });
   }
 
-  // دالة لحذف المنتج
   void _deleteProduct(String productId) {
     showDialog(
       context: context,
@@ -38,12 +63,14 @@ class _MenuAdminScreenState extends State<MenuAdminScreen> {
     );
   }
 
-  // نافذة إضافة منتج جديد
   void _showAddProductSheet() {
     final nameController = TextEditingController();
     final priceController = TextEditingController();
     final descController = TextEditingController();
     String? selectedCategoryId;
+    
+    File? pickedImage;
+    bool isUploading = false;
 
     showModalBottomSheet(
       context: context,
@@ -52,6 +79,17 @@ class _MenuAdminScreenState extends State<MenuAdminScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
+            
+            Future<void> pickImage() async {
+              final picker = ImagePicker();
+              final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+              if (pickedFile != null) {
+                setModalState(() {
+                  pickedImage = File(pickedFile.path);
+                });
+              }
+            }
+
             return Padding(
               padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom, top: 20, left: 20, right: 20),
               child: SingleChildScrollView(
@@ -60,58 +98,89 @@ class _MenuAdminScreenState extends State<MenuAdminScreen> {
                   children: [
                     const Text('إضافة منتج جديد', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.green)),
                     const SizedBox(height: 15),
+                    
+                    GestureDetector(
+                      onTap: pickImage,
+                      child: CircleAvatar(
+                        radius: 50,
+                        backgroundColor: Colors.green.shade50,
+                        backgroundImage: pickedImage != null ? FileImage(pickedImage!) : null,
+                        child: pickedImage == null ? const Icon(Icons.add_a_photo, size: 40, color: Colors.green) : null,
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+
                     TextField(controller: nameController, decoration: const InputDecoration(labelText: 'اسم المنتج', border: OutlineInputBorder())),
                     const SizedBox(height: 10),
                     TextField(controller: priceController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'السعر', border: OutlineInputBorder())),
                     const SizedBox(height: 10),
-                    TextField(controller: descController, decoration: const InputDecoration(labelText: 'الوصف المكونات', border: OutlineInputBorder())),
+                    TextField(controller: descController, decoration: const InputDecoration(labelText: 'الوصف أو المكونات', border: OutlineInputBorder())),
                     const SizedBox(height: 10),
                     
-                    // جلب الأقسام من فايربيز لوضعها في القائمة المنسدلة
                     StreamBuilder<QuerySnapshot>(
                       stream: FirebaseFirestore.instance.collection('categories').snapshots(),
                       builder: (context, snapshot) {
                         if (!snapshot.hasData) return const CircularProgressIndicator();
                         final categories = snapshot.data!.docs;
-                        
                         return DropdownButtonFormField<String>(
                           decoration: const InputDecoration(labelText: 'القسم', border: OutlineInputBorder()),
                           value: selectedCategoryId,
                           items: categories.map((cat) {
-                            return DropdownMenuItem<String>(
-                              value: cat.id,
-                              child: Text(cat['name']),
-                            );
+                            return DropdownMenuItem<String>(value: cat.id, child: Text(cat['name']));
                           }).toList(),
                           onChanged: (val) {
-                            setModalState(() {
-                              selectedCategoryId = val;
-                            });
+                            setModalState(() { selectedCategoryId = val; });
                           },
                         );
                       },
                     ),
                     const SizedBox(height: 20),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green, minimumSize: const Size(double.infinity, 50)),
-                      onPressed: () {
-                        if (nameController.text.isEmpty || priceController.text.isEmpty || selectedCategoryId == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('أكمل البيانات الأساسية أولاً')));
-                          return;
-                        }
-                        FirebaseFirestore.instance.collection('products').add({
-                          'name': nameController.text,
-                          'price': double.tryParse(priceController.text) ?? 0.0,
-                          'description': descController.text,
-                          'categoryId': selectedCategoryId,
-                          'isAvailable': true,
-                          'imageUrl': '',
-                          'createdAt': FieldValue.serverTimestamp(),
-                        });
-                        Navigator.pop(ctx);
-                      },
-                      child: const Text('حفظ المنتج', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    ),
+                    
+                    isUploading 
+                      ? const CircularProgressIndicator(color: Colors.green)
+                      : ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green, minimumSize: const Size(double.infinity, 50)),
+                          onPressed: () async {
+                            if (nameController.text.isEmpty || priceController.text.isEmpty || selectedCategoryId == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الرجاء إكمال البيانات الأساسية')));
+                              return;
+                            }
+
+                            setModalState(() { isUploading = true; });
+
+                            try {
+                              String imageUrl = '';
+                              
+                              // الرفع إلى Uploadcare إذا تم اختيار صورة
+                              if (pickedImage != null) {
+                                String? uploadedUrl = await _uploadToUploadcare(pickedImage!);
+                                if (uploadedUrl != null) {
+                                  imageUrl = uploadedUrl;
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('فشل رفع الصورة، سيتم الحفظ بدونها')));
+                                }
+                              }
+
+                              await FirebaseFirestore.instance.collection('products').add({
+                                'name': nameController.text,
+                                'price': double.tryParse(priceController.text) ?? 0.0,
+                                'description': descController.text,
+                                'categoryId': selectedCategoryId,
+                                'isAvailable': true,
+                                'imageUrl': imageUrl,
+                                'createdAt': FieldValue.serverTimestamp(),
+                              });
+
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت الإضافة بنجاح!')));
+                            } catch (error) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('حدث خطأ: $error')));
+                            } finally {
+                              setModalState(() { isUploading = false; });
+                            }
+                          },
+                          child: const Text('حفظ المنتج', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        ),
                     const SizedBox(height: 20),
                   ],
                 ),
@@ -146,12 +215,13 @@ class _MenuAdminScreenState extends State<MenuAdminScreen> {
           final products = snapshot.data!.docs;
 
           return ListView.builder(
-            padding: const EdgeInsets.only(bottom: 80), // مساحة للزر العائم
+            padding: const EdgeInsets.only(bottom: 80),
             itemCount: products.length,
             itemBuilder: (context, index) {
               var product = products[index].data() as Map<String, dynamic>;
               String productId = products[index].id;
               bool isAvailable = product['isAvailable'] ?? true;
+              String imageUrl = product['imageUrl'] ?? '';
 
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -160,8 +230,10 @@ class _MenuAdminScreenState extends State<MenuAdminScreen> {
                 child: ListTile(
                   contentPadding: const EdgeInsets.all(12),
                   leading: CircleAvatar(
-                    backgroundColor: isAvailable ? Colors.green.shade100 : Colors.grey.shade300,
-                    child: Icon(Icons.fastfood, color: isAvailable ? Colors.green : Colors.grey),
+                    radius: 25,
+                    backgroundColor: isAvailable ? Colors.green.shade50 : Colors.grey.shade200,
+                    backgroundImage: imageUrl.isNotEmpty ? NetworkImage(imageUrl) : null,
+                    child: imageUrl.isEmpty ? Icon(Icons.fastfood, color: isAvailable ? Colors.green : Colors.grey) : null,
                   ),
                   title: Text(product['name'] ?? '', style: TextStyle(fontWeight: FontWeight.bold, decoration: isAvailable ? null : TextDecoration.lineThrough)),
                   subtitle: Text('${product['price']} ج\n${product['description'] ?? ''}'),
