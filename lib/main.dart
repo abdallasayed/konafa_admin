@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'screens/dashboard_screen.dart';
+import 'screens/admin_auth_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,13 +28,27 @@ class KonafaAdminApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'إدارة كنافة بالقشطة',
+      title: 'إدارة المتاجر',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueGrey), // لون مختلف لتمييز تطبيق الإدارة
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueGrey),
         scaffoldBackgroundColor: Colors.grey[100],
         useMaterial3: true,
       ),
-      home: const DashboardScreen(),
+      // مراقبة حالة تسجيل الدخول للمدير
+      home: StreamBuilder<User?>(
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasData) {
+            // إذا كان مسجلاً، ادخله للوحة التحكم
+            return const DashboardScreen();
+          }
+          // إذا لم يكن مسجلاً، اطلب منه الدخول أو إنشاء متجر
+          return const AdminAuthScreen();
+        },
+      ),
     );
   }
 }
