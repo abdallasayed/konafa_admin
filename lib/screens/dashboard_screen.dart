@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'orders_admin_screen.dart'; // استدعاء شاشة الطلبات
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -26,7 +26,8 @@ class DashboardScreen extends StatelessWidget {
                 mainAxisSpacing: 16,
                 children: [
                   _buildDashboardCard(context, 'الطلبات الجديدة', Icons.receipt_long, Colors.orange, () {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('سنبرمجها في الخطوة القادمة!')));
+                    // الانتقال إلى شاشة الطلبات
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const OrdersAdminScreen()));
                   }),
                   _buildDashboardCard(context, 'إدارة المنيو', Icons.restaurant_menu, Colors.green, () {}),
                   _buildDashboardCard(context, 'العملاء', Icons.people, Colors.blue, () {}),
