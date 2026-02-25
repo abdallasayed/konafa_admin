@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import 'orders_admin_screen.dart'; // استدعاء شاشة الطلبات
+import 'orders_admin_screen.dart';
+import 'menu_admin_screen.dart';
+import 'customers_admin_screen.dart'; // استدعاء شاشة العملاء
+import 'offers_admin_screen.dart';   // استدعاء شاشة العروض
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -26,12 +29,17 @@ class DashboardScreen extends StatelessWidget {
                 mainAxisSpacing: 16,
                 children: [
                   _buildDashboardCard(context, 'الطلبات الجديدة', Icons.receipt_long, Colors.orange, () {
-                    // الانتقال إلى شاشة الطلبات
                     Navigator.push(context, MaterialPageRoute(builder: (context) => const OrdersAdminScreen()));
                   }),
-                  _buildDashboardCard(context, 'إدارة المنيو', Icons.restaurant_menu, Colors.green, () {}),
-                  _buildDashboardCard(context, 'العملاء', Icons.people, Colors.blue, () {}),
-                  _buildDashboardCard(context, 'العروض والإشعارات', Icons.campaign, Colors.purple, () {}),
+                  _buildDashboardCard(context, 'إدارة المنيو', Icons.restaurant_menu, Colors.green, () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const MenuAdminScreen()));
+                  }),
+                  _buildDashboardCard(context, 'العملاء', Icons.people, Colors.blue, () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const CustomersAdminScreen()));
+                  }),
+                  _buildDashboardCard(context, 'العروض', Icons.campaign, Colors.purple, () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const OffersAdminScreen()));
+                  }),
                 ],
               ),
             ),
