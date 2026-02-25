@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'orders_admin_screen.dart';
 import 'menu_admin_screen.dart';
-import 'customers_admin_screen.dart'; // استدعاء شاشة العملاء
-import 'offers_admin_screen.dart';   // استدعاء شاشة العروض
+import 'customers_admin_screen.dart';
+import 'offers_admin_screen.dart';
+import 'categories_admin_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -11,16 +13,22 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('لوحة تحكم المدير', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        title: const Text('لوحة تحكم المتجر', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
         backgroundColor: Colors.blueGrey.shade800,
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.white),
+            onPressed: () => FirebaseAuth.instance.signOut(), // تسجيل الخروج
+          )
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('مرحباً بك في نظام الإدارة', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const Text('إدارة متجرك', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
             Expanded(
               child: GridView.count(
@@ -28,18 +36,11 @@ class DashboardScreen extends StatelessWidget {
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
                 children: [
-                  _buildDashboardCard(context, 'الطلبات الجديدة', Icons.receipt_long, Colors.orange, () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const OrdersAdminScreen()));
-                  }),
-                  _buildDashboardCard(context, 'إدارة المنيو', Icons.restaurant_menu, Colors.green, () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const MenuAdminScreen()));
-                  }),
-                  _buildDashboardCard(context, 'العملاء', Icons.people, Colors.blue, () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const CustomersAdminScreen()));
-                  }),
-                  _buildDashboardCard(context, 'العروض', Icons.campaign, Colors.purple, () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const OffersAdminScreen()));
-                  }),
+                  _buildDashboardCard(context, 'الطلبات', Icons.receipt_long, Colors.orange, () => Navigator.push(context, MaterialPageRoute(builder: (context) => const OrdersAdminScreen()))),
+                  _buildDashboardCard(context, 'الأقسام', Icons.category, Colors.teal, () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CategoriesAdminScreen()))),
+                  _buildDashboardCard(context, 'المنتجات', Icons.restaurant_menu, Colors.green, () => Navigator.push(context, MaterialPageRoute(builder: (context) => const MenuAdminScreen()))),
+                  _buildDashboardCard(context, 'العملاء', Icons.people, Colors.blue, () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CustomersAdminScreen()))),
+                  _buildDashboardCard(context, 'العروض', Icons.campaign, Colors.purple, () => Navigator.push(context, MaterialPageRoute(builder: (context) => const OffersAdminScreen()))),
                 ],
               ),
             ),
