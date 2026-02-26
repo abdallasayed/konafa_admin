@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class OffersAdminScreen extends StatefulWidget {
   const OffersAdminScreen({super.key});
@@ -10,9 +11,16 @@ class OffersAdminScreen extends StatefulWidget {
 
 class _OffersAdminScreenState extends State<OffersAdminScreen> {
   
-  void _showAddOfferSheet() {
+  void _showAddOfferSheet() async {
     final titleController = TextEditingController();
     final descController = TextEditingController();
+    
+    // جلب بيانات المتجر لحفظ اسمه مع العرض
+    final storeId = FirebaseAuth.instance.currentUser!.uid;
+    DocumentSnapshot storeDoc = await FirebaseFirestore.instance.collection('stores').doc(storeId).get();
+    String storeName = storeDoc['storeName'] ?? 'متجر';
+
+    if(!mounted) return;
 
     showModalBottomSheet(
       context: context,
@@ -24,7 +32,7 @@ class _OffersAdminScreenState extends State<OffersAdminScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('إضافة عرض جديد', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.purple)),
+              const Text('إضافة عرض لمتجرك', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.purple)),
               const SizedBox(height: 15),
               TextField(controller: titleController, decoration: const InputDecoration(labelText: 'عنوان العرض (مثال: خصم 20%)', border: OutlineInputBorder())),
               const SizedBox(height: 10),
@@ -37,6 +45,8 @@ class _OffersAdminScreenState extends State<OffersAdminScreen> {
                   FirebaseFirestore.instance.collection('offers').add({
                     'title': titleController.text,
                     'description': descController.text,
+                    'storeId': storeId, // ربط العرض بالمتجر
+                    'storeName': storeName, // حفظ اسم المتجر للعرض للعملاء
                     'createdAt': FieldValue.serverTimestamp(),
                   });
                   Navigator.pop(ctx);
@@ -53,9 +63,11 @@ class _OffersAdminScreenState extends State<OffersAdminScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final storeId = FirebaseAuth.instance.currentUser!.uid;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('العروض والإشعارات', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text('عروض متجري', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.purple.shade700,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -66,10 +78,11 @@ class _OffersAdminScreenState extends State<OffersAdminScreen> {
         label: const Text('عرض جديد', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('offers').orderBy('createdAt', descending: true).snapshots(),
+        // عزل العروض: جلب عروض هذا المتجر فقط
+        stream: FirebaseFirestore.instance.collection('offers').where('storeId', isEqualTo: storeId).orderBy('createdAt', descending: true).snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const Center(child: Text('لا توجد عروض حالياً'));
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const Center(child: Text('لا توجد عروض لمتجرك حالياً'));
 
           final offers = snapshot.data!.docs;
 
