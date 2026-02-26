@@ -1,3 +1,4 @@
+import '../services/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -72,6 +73,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
 
   void _sendMessage() async {
     if (_msgController.text.trim().isEmpty) return;
+// إرسال الإشعار الفوري لهاتف التاجر     var storeOwnerDoc = await FirebaseFirestore.instance.collection('users').doc(widget.storeId).get();       String targetToken = storeOwnerDoc['oneSignalId'];       await NotificationService.sendNotification(targetOneSignalId: targetToken, title: 'رسالة جديدة من الإدارة 📩', bodyMsg: _msgController.text.trim());     }
     await FirebaseFirestore.instance.collection('support_messages').add({
       'storeId': widget.storeId,
       'storeName': widget.storeName,
