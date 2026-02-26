@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'manage_stores_screen.dart';
+import 'manage_users_screen.dart';
 
 class SuperAdminDashboard extends StatelessWidget {
   const SuperAdminDashboard({super.key});
@@ -9,90 +10,65 @@ class SuperAdminDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('لوحة تحكم المنصة (المدير العام)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18)),
-        backgroundColor: Colors.red.shade800, // لون مميز للمدير العام
+        title: const Text('المالك العام للمنصة', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        backgroundColor: Colors.red.shade800,
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: () => FirebaseAuth.instance.signOut(),
-          )
+          IconButton(icon: const Icon(Icons.logout, color: Colors.white), onPressed: () => FirebaseAuth.instance.signOut())
         ],
       ),
-      body: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            width: double.infinity,
-            color: Colors.red.shade50,
-            child: const Column(
-              children: [
-                Icon(Icons.admin_panel_settings, size: 60, color: Colors.red),
-                SizedBox(height: 10),
-                Text('أهلاً بك يا مالك المنصة', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.red)),
-                Text('من هنا يمكنك إدارة جميع المتاجر المسجلة', style: TextStyle(color: Colors.black54)),
-              ],
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              width: double.infinity,
+              decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(15)),
+              child: const Column(
+                children: [
+                  Icon(Icons.admin_panel_settings, size: 60, color: Colors.red),
+                  SizedBox(height: 10),
+                  Text('مركز السيطرة والتحكم', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.red)),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 10),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.0),
-            child: Align(alignment: Alignment.centerRight, child: Text('المتاجر المسجلة:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
-          ),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('stores').orderBy('createdAt', descending: true).snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator(color: Colors.red));
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const Center(child: Text('لا توجد متاجر مسجلة حتى الآن'));
-
-                final stores = snapshot.data!.docs;
-
-                return ListView.builder(
-                  itemCount: stores.length,
-                  itemBuilder: (context, index) {
-                    var store = stores[index].data() as Map<String, dynamic>;
-                    String storeId = stores[index].id;
-                    bool isActive = store['isActive'] ?? true;
-
-                    return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      elevation: 3,
-                      child: ListTile(
-                        leading: CircleAvatar(backgroundColor: Colors.red.shade100, child: const Icon(Icons.store, color: Colors.red)),
-                        title: Text(store['storeName'] ?? 'متجر غير معروف', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(store['ownerEmail'] ?? ''),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_forever, color: Colors.red),
-                          onPressed: () {
-                            // دالة حذف المتجر (كمثال مبدئي للتحكم)
-                            showDialog(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                title: const Text('حذف المتجر؟', style: TextStyle(color: Colors.red)),
-                                content: Text('هل أنت متأكد من حذف متجر "${store['storeName']}" نهائياً؟'),
-                                actions: [
-                                  TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-                                  TextButton(
-                                    onPressed: () {
-                                      FirebaseFirestore.instance.collection('stores').doc(storeId).delete();
-                                      Navigator.pop(ctx);
-                                    },
-                                    child: const Text('حذف', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
+            const SizedBox(height: 30),
+            Expanded(
+              child: GridView.count(
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                children: [
+                  _buildCard(context, 'إدارة التجار', Icons.storefront, Colors.red, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageStoresScreen()))),
+                  _buildCard(context, 'إدارة العملاء', Icons.people, Colors.blueGrey, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageUsersScreen()))),
+                  _buildCard(context, 'صندوق الدعم', Icons.support_agent, Colors.purple, () {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('سنقوم ببرمجة نظام المراسلات في الخطوة القادمة!')));
+                  }),
+                  _buildCard(context, 'إعدادات المنصة', Icons.settings, Colors.grey.shade700, () {}),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCard(BuildContext context, String title, IconData icon, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Card(
+        elevation: 6,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircleAvatar(radius: 35, backgroundColor: color.withOpacity(0.2), child: Icon(icon, size: 35, color: color)),
+            const SizedBox(height: 15),
+            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
       ),
     );
   }
