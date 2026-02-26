@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/admin_auth_screen.dart';
+import 'screens/super_admin_dashboard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,24 +30,39 @@ class KonafaAdminApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'إدارة المتاجر',
+      title: 'إدارة المنصة',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueGrey),
         scaffoldBackgroundColor: Colors.grey[100],
         useMaterial3: true,
       ),
-      // مراقبة حالة تسجيل الدخول للمدير
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+          if (snapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          
           if (snapshot.hasData) {
-            // إذا كان مسجلاً، ادخله للوحة التحكم
-            return const DashboardScreen();
+            // التحقق من نوع الحساب المسجل
+            return FutureBuilder<DocumentSnapshot>(
+              future: FirebaseFirestore.instance.collection('users').doc(snapshot.data!.uid).get(),
+              builder: (context, userSnapshot) {
+                if (userSnapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+                
+                String role = 'store_owner'; // الافتراضي تاجر
+                if (userSnapshot.hasData && userSnapshot.data!.exists) {
+                  role = (userSnapshot.data!.data() as Map<String, dynamic>)['role'] ?? 'store_owner';
+                }
+
+                // التوجيه الذكي بناءً على الصلاحية
+                if (role == 'super_admin') {
+                  return const SuperAdminDashboard(); // فتح لوحة التحكم الخارقة لك
+                } else {
+                  return const DashboardScreen(); // فتح لوحة المتجر العادية للتاجر
+                }
+              },
+            );
           }
-          // إذا لم يكن مسجلاً، اطلب منه الدخول أو إنشاء متجر
+          
           return const AdminAuthScreen();
         },
       ),
