@@ -15,7 +15,6 @@ class _OffersAdminScreenState extends State<OffersAdminScreen> {
     final titleController = TextEditingController();
     final descController = TextEditingController();
     
-    // جلب بيانات المتجر لحفظ اسمه مع العرض
     final storeId = FirebaseAuth.instance.currentUser!.uid;
     DocumentSnapshot storeDoc = await FirebaseFirestore.instance.collection('stores').doc(storeId).get();
     String storeName = storeDoc['storeName'] ?? 'متجر';
@@ -34,7 +33,7 @@ class _OffersAdminScreenState extends State<OffersAdminScreen> {
             children: [
               const Text('إضافة عرض لمتجرك', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.purple)),
               const SizedBox(height: 15),
-              TextField(controller: titleController, decoration: const InputDecoration(labelText: 'عنوان العرض (مثال: خصم 20%)', border: OutlineInputBorder())),
+              TextField(controller: titleController, decoration: const InputDecoration(labelText: 'عنوان العرض', border: OutlineInputBorder())),
               const SizedBox(height: 10),
               TextField(controller: descController, decoration: const InputDecoration(labelText: 'تفاصيل العرض', border: OutlineInputBorder())),
               const SizedBox(height: 20),
@@ -45,8 +44,8 @@ class _OffersAdminScreenState extends State<OffersAdminScreen> {
                   FirebaseFirestore.instance.collection('offers').add({
                     'title': titleController.text,
                     'description': descController.text,
-                    'storeId': storeId, // ربط العرض بالمتجر
-                    'storeName': storeName, // حفظ اسم المتجر للعرض للعملاء
+                    'storeId': storeId,
+                    'storeName': storeName,
                     'createdAt': FieldValue.serverTimestamp(),
                   });
                   Navigator.pop(ctx);
@@ -66,11 +65,7 @@ class _OffersAdminScreenState extends State<OffersAdminScreen> {
     final storeId = FirebaseAuth.instance.currentUser!.uid;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('عروض متجري', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.purple.shade700,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
+      appBar: AppBar(title: const Text('عروض متجري', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)), backgroundColor: Colors.purple.shade700, iconTheme: const IconThemeData(color: Colors.white)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddOfferSheet,
         backgroundColor: Colors.purple.shade700,
@@ -78,13 +73,19 @@ class _OffersAdminScreenState extends State<OffersAdminScreen> {
         label: const Text('عرض جديد', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        // عزل العروض: جلب عروض هذا المتجر فقط
-        stream: FirebaseFirestore.instance.collection('offers').where('storeId', isEqualTo: storeId).orderBy('createdAt', descending: true).snapshots(),
+        stream: FirebaseFirestore.instance.collection('offers').where('storeId', isEqualTo: storeId).snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const Center(child: Text('لا توجد عروض لمتجرك حالياً'));
 
-          final offers = snapshot.data!.docs;
+          // الترتيب محلياً لمنع الاختفاء
+          var offers = snapshot.data!.docs.toList();
+          offers.sort((a, b) {
+            Timestamp? tA = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+            Timestamp? tB = (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+            if (tA == null || tB == null) return 0;
+            return tB.compareTo(tA);
+          });
 
           return ListView.builder(
             padding: const EdgeInsets.only(bottom: 80),
@@ -102,10 +103,7 @@ class _OffersAdminScreenState extends State<OffersAdminScreen> {
                   leading: const CircleAvatar(backgroundColor: Colors.purpleAccent, child: Icon(Icons.local_offer, color: Colors.white)),
                   title: Text(offer['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                   subtitle: Text(offer['description'] ?? ''),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () => FirebaseFirestore.instance.collection('offers').doc(offerId).delete(),
-                  ),
+                  trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => FirebaseFirestore.instance.collection('offers').doc(offerId).delete()),
                 ),
               );
             },

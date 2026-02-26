@@ -63,13 +63,22 @@ class _OrdersAdminScreenState extends State<OrdersAdminScreen> {
           ),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              // عزل الطلبات: جلب طلبات هذا المتجر فقط!
-              stream: FirebaseFirestore.instance.collection('orders').where('storeId', isEqualTo: storeId).orderBy('createdAt', descending: true).snapshots(),
+              // إزالة orderBy لحل مشكلة اختفاء البيانات (Missing Index)
+              stream: FirebaseFirestore.instance.collection('orders').where('storeId', isEqualTo: storeId).snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const Center(child: Text('لا توجد طلبات لمتجرك حتى الآن', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)));
 
-                final orders = snapshot.data!.docs.where((doc) {
+                // جلب الطلبات وترتيبها زمنياً برمجياً بدلاً من السيرفر
+                var rawDocs = snapshot.data!.docs.toList();
+                rawDocs.sort((a, b) {
+                  Timestamp? tA = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+                  Timestamp? tB = (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+                  if (tA == null || tB == null) return 0;
+                  return tB.compareTo(tA);
+                });
+
+                final orders = rawDocs.where((doc) {
                   var data = doc.data() as Map<String, dynamic>;
                   String phone = (data['customerPhone'] ?? '').toString();
                   String orderId = doc.id.toLowerCase();
@@ -124,7 +133,6 @@ class _OrdersAdminScreenState extends State<OrdersAdminScreen> {
                             const Text('التفاصيل:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                             const SizedBox(height: 5),
                             ...((order['items'] as List<dynamic>? ?? []).map((item) {
-                              // إذا كان العنصر عبارة عن عرض، نظهر كلمة (عرض) بجواره
                               bool isOffer = item['isOffer'] ?? false;
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 4.0),
