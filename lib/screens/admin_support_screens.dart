@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-// ----------------- الشاشة الأولى: قائمة المتاجر -----------------
 class AdminSupportListScreen extends StatelessWidget {
   const AdminSupportListScreen({super.key});
 
@@ -12,9 +11,7 @@ class AdminSupportListScreen extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance.collection('stores').snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const Center(child: Text('لا توجد متاجر للتواصل معها'));
-
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           final stores = snapshot.data!.docs;
 
           return ListView.builder(
@@ -23,18 +20,24 @@ class AdminSupportListScreen extends StatelessWidget {
               var store = stores[index].data() as Map<String, dynamic>;
               String storeId = stores[index].id;
 
-              return Card(
-                elevation: 3,
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: ListTile(
-                  leading: const CircleAvatar(backgroundColor: Colors.purple, child: Icon(Icons.support_agent, color: Colors.white)),
-                  title: Text(store['storeName'] ?? 'متجر', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('اضغط لفتح المحادثة'),
-                  trailing: const Icon(Icons.chat, color: Colors.purple),
-                  onTap: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => AdminChatScreen(storeId: storeId, storeName: store['storeName'] ?? 'متجر')));
-                  },
-                ),
+              return StreamBuilder<QuerySnapshot>(
+                // استماع للرسائل غير المقروءة لهذا المتجر
+                stream: FirebaseFirestore.instance.collection('support_messages').where('storeId', isEqualTo: storeId).where('sender', isEqualTo: 'store').where('isRead', isEqualTo: false).snapshots(),
+                builder: (ctx, msgSnapshot) {
+                  int unreadCount = msgSnapshot.hasData ? msgSnapshot.data!.docs.length : 0;
+                  
+                  return Card(
+                    elevation: 3,
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: ListTile(
+                      leading: const CircleAvatar(backgroundColor: Colors.purple, child: Icon(Icons.support_agent, color: Colors.white)),
+                      title: Text(store['storeName'] ?? 'متجر', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text(unreadCount > 0 ? 'لديك $unreadCount رسالة جديدة!' : 'اضغط لفتح المحادثة', style: TextStyle(color: unreadCount > 0 ? Colors.red : Colors.grey, fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal)),
+                      trailing: unreadCount > 0 ? CircleAvatar(radius: 12, backgroundColor: Colors.red, child: Text('$unreadCount', style: const TextStyle(color: Colors.white, fontSize: 12))) : const Icon(Icons.chat, color: Colors.purple),
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AdminChatScreen(storeId: storeId, storeName: store['storeName'] ?? 'متجر'))),
+                    ),
+                  );
+                }
               );
             },
           );
@@ -44,7 +47,6 @@ class AdminSupportListScreen extends StatelessWidget {
   }
 }
 
-// ----------------- الشاشة الثانية: المحادثة مع التاجر -----------------
 class AdminChatScreen extends StatefulWidget {
   final String storeId;
   final String storeName;
@@ -57,17 +59,27 @@ class AdminChatScreen extends StatefulWidget {
 class _AdminChatScreenState extends State<AdminChatScreen> {
   final TextEditingController _msgController = TextEditingController();
 
+  @override
+  void initState() {
+    super.initState();
+    _markMessagesAsRead();
+  }
+
+  void _markMessagesAsRead() async {
+    var unreadMsgs = await FirebaseFirestore.instance.collection('support_messages').where('storeId', isEqualTo: widget.storeId).where('sender', isEqualTo: 'store').where('isRead', isEqualTo: false).get();
+    for (var doc in unreadMsgs.docs) { doc.reference.update({'isRead': true}); }
+  }
+
   void _sendMessage() async {
     if (_msgController.text.trim().isEmpty) return;
-    
     await FirebaseFirestore.instance.collection('support_messages').add({
       'storeId': widget.storeId,
       'storeName': widget.storeName,
       'text': _msgController.text.trim(),
       'sender': 'super_admin',
+      'isRead': false,
       'createdAt': FieldValue.serverTimestamp(),
     });
-    
     _msgController.clear();
   }
 
@@ -79,13 +91,9 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
         children: [
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              // إزالة orderBy
               stream: FirebaseFirestore.instance.collection('support_messages').where('storeId', isEqualTo: widget.storeId).snapshots(),
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const Center(child: Text('لا توجد رسائل بينك وبين هذا المتجر'));
-
-                // الترتيب المحلي
+                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
                 var messages = snapshot.data!.docs.toList();
                 messages.sort((a, b) {
                   Timestamp? tA = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
@@ -116,14 +124,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                             bottomRight: isAdmin ? Radius.zero : const Radius.circular(15),
                           ),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(isAdmin ? 'أنا (الإدارة)' : widget.storeName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isAdmin ? Colors.red : Colors.blueGrey)),
-                            const SizedBox(height: 5),
-                            Text(msg['text'] ?? '', style: const TextStyle(fontSize: 16)),
-                          ],
-                        ),
+                        child: Text(msg['text'] ?? '', style: const TextStyle(fontSize: 16)),
                       ),
                     );
                   },
@@ -136,18 +137,8 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
             color: Colors.white,
             child: Row(
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _msgController,
-                    decoration: InputDecoration(hintText: 'اكتب ردك للتاجر...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(25))),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                CircleAvatar(
-                  radius: 25,
-                  backgroundColor: Colors.purple.shade700,
-                  child: IconButton(icon: const Icon(Icons.send, color: Colors.white), onPressed: _sendMessage),
-                )
+                Expanded(child: TextField(controller: _msgController, decoration: InputDecoration(hintText: 'اكتب ردك...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(25))))),
+                IconButton(icon: const Icon(Icons.send, color: Colors.purple), onPressed: _sendMessage)
               ],
             ),
           )

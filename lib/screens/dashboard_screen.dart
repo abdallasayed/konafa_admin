@@ -104,18 +104,52 @@ class DashboardScreen extends StatelessWidget {
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
                 children: [
-                  _buildDashboardCard(context, 'الطلبات', Icons.receipt_long, Colors.orange, () => Navigator.push(context, MaterialPageRoute(builder: (context) => const OrdersAdminScreen()))),
+                  _buildBadgeCard(context, 'الطلبات', Icons.receipt_long, Colors.orange, FirebaseFirestore.instance.collection('orders').where('storeId', isEqualTo: storeId).where('status', isEqualTo: 'قيد المراجعة').snapshots(), () => Navigator.push(context, MaterialPageRoute(builder: (context) => const OrdersAdminScreen()))),
                   _buildDashboardCard(context, 'الأقسام', Icons.category, Colors.teal, () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CategoriesAdminScreen()))),
                   _buildDashboardCard(context, 'المنتجات', Icons.restaurant_menu, Colors.green, () => Navigator.push(context, MaterialPageRoute(builder: (context) => const MenuAdminScreen()))),
                   _buildDashboardCard(context, 'العروض', Icons.campaign, Colors.purple, () => Navigator.push(context, MaterialPageRoute(builder: (context) => const OffersAdminScreen()))),
                   _buildDashboardCard(context, 'العملاء', Icons.people, Colors.blue, () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CustomersAdminScreen()))),
-                  _buildDashboardCard(context, 'الدعم الفني', Icons.support_agent, Colors.indigo, () => Navigator.push(context, MaterialPageRoute(builder: (context) => const StoreSupportScreen()))),
+                  _buildBadgeCard(context, 'الدعم الفني', Icons.support_agent, Colors.indigo, FirebaseFirestore.instance.collection('support_messages').where('storeId', isEqualTo: storeId).where('sender', isEqualTo: 'super_admin').where('isRead', isEqualTo: false).snapshots(), () => Navigator.push(context, MaterialPageRoute(builder: (context) => const StoreSupportScreen()))),
                 ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildBadgeCard(BuildContext context, String title, IconData icon, Color color, Stream<QuerySnapshot> stream, VoidCallback onTap) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: stream,
+      builder: (context, snapshot) {
+        int badgeCount = snapshot.hasData ? snapshot.data!.docs.length : 0;
+        return GestureDetector(
+          onTap: onTap,
+          child: Card(
+            elevation: 4,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircleAvatar(radius: 30, backgroundColor: color.withOpacity(0.2), child: Icon(icon, size: 30, color: color)),
+                    const SizedBox(height: 15),
+                    Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                if (badgeCount > 0)
+                  Positioned(
+                    top: 10, right: 10,
+                    child: CircleAvatar(radius: 12, backgroundColor: Colors.red, child: Text("$badgeCount", style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
+                  )
+              ],
+            ),
+          ),
+        );
+      }
     );
   }
 

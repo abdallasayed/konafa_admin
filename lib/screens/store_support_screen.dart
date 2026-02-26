@@ -18,13 +18,24 @@ class _StoreSupportScreenState extends State<StoreSupportScreen> {
   void initState() {
     super.initState();
     _getStoreName();
+    _markMessagesAsRead();
+  }
+
+  // تحويل رسائل المدير إلى "مقروءة" بمجرد فتح الشاشة
+  void _markMessagesAsRead() async {
+    var unreadMsgs = await FirebaseFirestore.instance.collection('support_messages')
+        .where('storeId', isEqualTo: storeId)
+        .where('sender', isEqualTo: 'super_admin')
+        .where('isRead', isEqualTo: false).get();
+        
+    for (var doc in unreadMsgs.docs) {
+      doc.reference.update({'isRead': true});
+    }
   }
 
   void _getStoreName() async {
     var doc = await FirebaseFirestore.instance.collection('stores').doc(storeId).get();
-    if (doc.exists && mounted) {
-      setState(() => storeName = doc['storeName'] ?? 'متجري');
-    }
+    if (doc.exists && mounted) setState(() => storeName = doc['storeName'] ?? 'متجري');
   }
 
   void _sendMessage() async {
@@ -35,6 +46,7 @@ class _StoreSupportScreenState extends State<StoreSupportScreen> {
       'storeName': storeName,
       'text': _msgController.text.trim(),
       'sender': 'store',
+      'isRead': false, // إرسالها كرسالة غير مقروءة للمدير
       'createdAt': FieldValue.serverTimestamp(),
     });
     
@@ -49,13 +61,9 @@ class _StoreSupportScreenState extends State<StoreSupportScreen> {
         children: [
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              // تم إزالة orderBy من هنا لحل المشكلة
               stream: FirebaseFirestore.instance.collection('support_messages').where('storeId', isEqualTo: storeId).snapshots(),
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const Center(child: Text('لا توجد رسائل سابقة. أرسل استفسارك الآن!'));
-
-                // الترتيب المحلي السريع
+                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
                 var messages = snapshot.data!.docs.toList();
                 messages.sort((a, b) {
                   Timestamp? tA = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
@@ -106,18 +114,8 @@ class _StoreSupportScreenState extends State<StoreSupportScreen> {
             color: Colors.white,
             child: Row(
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _msgController,
-                    decoration: InputDecoration(hintText: 'اكتب رسالتك للإدارة...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(25))),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                CircleAvatar(
-                  radius: 25,
-                  backgroundColor: Colors.blueGrey.shade800,
-                  child: IconButton(icon: const Icon(Icons.send, color: Colors.white), onPressed: _sendMessage),
-                )
+                Expanded(child: TextField(controller: _msgController, decoration: InputDecoration(hintText: 'اكتب رسالتك...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(25))))),
+                IconButton(icon: const Icon(Icons.send, color: Colors.blueGrey), onPressed: _sendMessage)
               ],
             ),
           )
