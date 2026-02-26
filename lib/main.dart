@@ -42,7 +42,7 @@ class _KonafaAdminAppState extends State<KonafaAdminApp> {
   void _setupOneSignal() {
     OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
     // ستقوم باستبدال هذا بـ APP ID الخاص بك
-    OneSignal.initialize("ضع_الـ_APP_ID_هنا");
+    OneSignal.initialize("2d506dcb-8201-4f28-9c4e-6aeff5c6245f");
     OneSignal.Notifications.requestPermission(true);
 
     // عندما يتم توليد كود الهاتف، نحفظه فوراً في حساب المستخدم

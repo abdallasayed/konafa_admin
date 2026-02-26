@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 
 class NotificationService {
   // ستقوم باستبدال هذه القيم لاحقاً من حسابك في OneSignal
-  static const String _appId = "ضع_الـ_APP_ID_هنا";
-  static const String _restApiKey = "ضع_الـ_REST_API_KEY_هنا";
+  static const String _appId = "2d506dcb-8201-4f28-9c4e-6aeff5c6245f";
+  static const String _restApiKey = "Os_v2_app_fvig3s4cafhsrhconlx7lrrel73l6n4himbe2uvwdkg75xob6g7v7cd3srm7ma7pon3ws4gn4hfxi6qb74no2op2mpwmb43i57irlja";
 
   static Future<void> sendNotification({required String targetOneSignalId, required String title, required String bodyMsg}) async {
     if (_appId.contains("ضع_الـ")) return; // حماية لكي لا يعمل الكود قبل وضع مفاتيحك الحقيقية
