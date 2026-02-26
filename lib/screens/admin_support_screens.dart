@@ -64,7 +64,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
       'storeId': widget.storeId,
       'storeName': widget.storeName,
       'text': _msgController.text.trim(),
-      'sender': 'super_admin', // تحديد أن المرسل هو المدير العام
+      'sender': 'super_admin',
       'createdAt': FieldValue.serverTimestamp(),
     });
     
@@ -79,12 +79,20 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
         children: [
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('support_messages').where('storeId', isEqualTo: widget.storeId).orderBy('createdAt', descending: true).snapshots(),
+              // إزالة orderBy
+              stream: FirebaseFirestore.instance.collection('support_messages').where('storeId', isEqualTo: widget.storeId).snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const Center(child: Text('لا توجد رسائل بينك وبين هذا المتجر'));
 
-                final messages = snapshot.data!.docs;
+                // الترتيب المحلي
+                var messages = snapshot.data!.docs.toList();
+                messages.sort((a, b) {
+                  Timestamp? tA = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+                  Timestamp? tB = (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+                  if (tA == null || tB == null) return 0;
+                  return tB.compareTo(tA);
+                });
 
                 return ListView.builder(
                   reverse: true,
@@ -92,7 +100,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     var msg = messages[index].data() as Map<String, dynamic>;
-                    bool isAdmin = msg['sender'] == 'super_admin'; // هل الرسالة مني كمدير؟
+                    bool isAdmin = msg['sender'] == 'super_admin';
 
                     return Align(
                       alignment: isAdmin ? Alignment.centerRight : Alignment.centerLeft,

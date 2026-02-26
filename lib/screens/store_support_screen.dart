@@ -34,7 +34,7 @@ class _StoreSupportScreenState extends State<StoreSupportScreen> {
       'storeId': storeId,
       'storeName': storeName,
       'text': _msgController.text.trim(),
-      'sender': 'store', // تحديد أن المرسل هو التاجر
+      'sender': 'store',
       'createdAt': FieldValue.serverTimestamp(),
     });
     
@@ -49,20 +49,28 @@ class _StoreSupportScreenState extends State<StoreSupportScreen> {
         children: [
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('support_messages').where('storeId', isEqualTo: storeId).orderBy('createdAt', descending: true).snapshots(),
+              // تم إزالة orderBy من هنا لحل المشكلة
+              stream: FirebaseFirestore.instance.collection('support_messages').where('storeId', isEqualTo: storeId).snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const Center(child: Text('لا توجد رسائل سابقة. أرسل استفسارك الآن!'));
 
-                final messages = snapshot.data!.docs;
+                // الترتيب المحلي السريع
+                var messages = snapshot.data!.docs.toList();
+                messages.sort((a, b) {
+                  Timestamp? tA = (a.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+                  Timestamp? tB = (b.data() as Map<String, dynamic>)['createdAt'] as Timestamp?;
+                  if (tA == null || tB == null) return 0;
+                  return tB.compareTo(tA);
+                });
 
                 return ListView.builder(
-                  reverse: true, // لتبدأ الرسائل من الأسفل
+                  reverse: true,
                   padding: const EdgeInsets.all(16),
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     var msg = messages[index].data() as Map<String, dynamic>;
-                    bool isMe = msg['sender'] == 'store'; // هل الرسالة مني كتاجر؟
+                    bool isMe = msg['sender'] == 'store';
 
                     return Align(
                       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
