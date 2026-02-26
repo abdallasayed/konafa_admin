@@ -1,7 +1,9 @@
+import 'admin_support_screens.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'manage_stores_screen.dart';
 import 'manage_users_screen.dart';
+import 'admin_support_screens.dart';
 
 class SuperAdminDashboard extends StatelessWidget {
   const SuperAdminDashboard({super.key});
@@ -42,9 +44,7 @@ class SuperAdminDashboard extends StatelessWidget {
                 children: [
                   _buildCard(context, 'إدارة التجار', Icons.storefront, Colors.red, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageStoresScreen()))),
                   _buildCard(context, 'إدارة العملاء', Icons.people, Colors.blueGrey, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageUsersScreen()))),
-                  _buildCard(context, 'صندوق الدعم', Icons.support_agent, Colors.purple, () {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('سنقوم ببرمجة نظام المراسلات في الخطوة القادمة!')));
-                  }),
+                  _buildCard(context, 'صندوق الدعم', Icons.support_agent, Colors.purple, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminSupportListScreen()))),
                   _buildCard(context, 'إعدادات المنصة', Icons.settings, Colors.grey.shade700, () {}),
                 ],
               ),

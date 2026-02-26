@@ -1,3 +1,4 @@
+import 'store_support_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -108,6 +109,7 @@ class DashboardScreen extends StatelessWidget {
                   _buildDashboardCard(context, 'المنتجات', Icons.restaurant_menu, Colors.green, () => Navigator.push(context, MaterialPageRoute(builder: (context) => const MenuAdminScreen()))),
                   _buildDashboardCard(context, 'العروض', Icons.campaign, Colors.purple, () => Navigator.push(context, MaterialPageRoute(builder: (context) => const OffersAdminScreen()))),
                   _buildDashboardCard(context, 'العملاء', Icons.people, Colors.blue, () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CustomersAdminScreen()))),
+                  _buildDashboardCard(context, 'الدعم الفني', Icons.support_agent, Colors.indigo, () => Navigator.push(context, MaterialPageRoute(builder: (context) => const StoreSupportScreen()))),
                 ],
               ),
             ),
