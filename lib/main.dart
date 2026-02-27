@@ -96,3 +96,4 @@ class _KonafaAdminAppState extends State<KonafaAdminApp> {
 // Force SDK 21 via append
 // Force Kotlin 1.9.24
 // Updated Kotlin to 1.9.24 for OneSignal
+// Fixed Kotlin version everywhere
